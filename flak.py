@@ -1,20 +1,22 @@
-from flask import Flask, request, render_template, Response, jsonify
-from flask_cors import CORS, cross_origin
+from wsgiref import simple_server
+from flask import Flask, request, render_template
+from flask import Response
 import os
-import json
-import logging
-
+from flask_cors import CORS, cross_origin
 from prediction_Validation_Insertion import pred_validation
 from trainingModel import trainModel
 from training_Validation_Insertion import train_validation
+import flask_monitoringdashboard as dashboard
 from predictFromModel import prediction
+import json
 
-# Initialize Flask application
+os.putenv('LANG', 'en_US.UTF-8')
+os.putenv('LC_ALL', 'en_US.UTF-8')
+
 app = Flask(__name__)
+dashboard.bind(app)
 CORS(app)
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 
 @app.route("/", methods=['GET'])
 @cross_origin()
@@ -23,53 +25,77 @@ def home():
 
 @app.route("/predict", methods=['POST'])
 @cross_origin()
-def predict_route_client():
+def predictRouteClient():
     try:
-        data = request.get_json() if request.is_json else request.form
-        path = data.get('filepath')
-        if not path:
-            return jsonify({"error": "Filepath is required"}), 400
-        
-        pred_val = pred_validation(path)
-        pred_val.prediction_validation()
-        
-        pred = prediction(path)
-        path, json_predictions = pred.predictionFromModel()
-        
-        return jsonify({
-            "message": f"Prediction File created at {path}",
-            "predictions": json.loads(json_predictions)
-        })
-    except (ValueError, KeyError) as e:
-        logging.error(f"ValueError or KeyError: {e}")
-        return jsonify({"error": f"Error Occurred: {str(e)}"}), 400
+        if request.json is not None:
+            path = request.json['filepath']
+
+            pred_val = pred_validation(path) #object initialization
+
+            pred_val.prediction_validation() #calling the prediction_validation function
+
+            pred = prediction(path) #object initialization
+
+            # predicting for dataset present in database
+            path,json_predictions = pred.predictionFromModel()
+            return Response("Prediction File created at !!!"  +str(path) +'and few of the predictions are '+str(json.loads(json_predictions) ))
+        elif request.form is not None:
+            path = request.form['filepath']
+
+            pred_val = pred_validation(path) #object initialization
+
+            pred_val.prediction_validation() #calling the prediction_validation function
+
+            pred = prediction(path) #object initialization
+
+            # predicting for dataset present in database
+            path,json_predictions = pred.predictionFromModel()
+            return Response("Prediction File created at !!!"  +str(path) +'and few of the predictions are '+str(json.loads(json_predictions) ))
+        else:
+            print('Nothing Matched')
+    except ValueError:
+        return Response("Error Occurred! %s" %ValueError)
+    except KeyError:
+        return Response("Error Occurred! %s" %KeyError)
     except Exception as e:
-        logging.error(f"Exception: {e}")
-        return jsonify({"error": f"Error Occurred: {str(e)}"}), 500
+        return Response("Error Occurred! %s" %e)
+
+
 
 @app.route("/train", methods=['POST'])
 @cross_origin()
-def train_route_client():
-    try:
-        data = request.get_json()
-        path = data.get('folderPath')
-        if not path:
-            return jsonify({"error": "Folder path is required"}), 400
-        
-        train_val_obj = train_validation(path)
-        train_val_obj.train_validation()
-        
-        train_model_obj = trainModel()
-        train_model_obj.trainingModel()
-        
-        return jsonify({"message": "Training successful!"})
-    except (ValueError, KeyError) as e:
-        logging.error(f"ValueError or KeyError: {e}")
-        return jsonify({"error": f"Error Occurred: {str(e)}"}), 400
-    except Exception as e:
-        logging.error(f"Exception: {e}")
-        return jsonify({"error": f"Error Occurred: {str(e)}"}), 500
+def trainRouteClient():
 
+    try:
+        if request.json['folderPath'] is not None:
+            path = request.json['folderPath']
+
+            train_valObj = train_validation(path) #object initialization
+
+            train_valObj.train_validation()#calling the training_validation function
+
+
+            trainModelObj = trainModel() #object initialization
+            trainModelObj.trainingModel() #training the model for the files in the table
+
+
+    except ValueError:
+
+        return Response("Error Occurred! %s" % ValueError)
+
+    except KeyError:
+
+        return Response("Error Occurred! %s" % KeyError)
+
+    except Exception as e:
+
+        return Response("Error Occurred! %s" % e)
+    return Response("Training successfull!!")
+
+port = int(os.getenv("PORT",5000))
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    host = '0.0.0.0'
+    #port = 5000
+    httpd = simple_server.make_server(host, port, app)
+    # print("Serving on %s %d" % (host, port))
+    httpd.serve_forever()

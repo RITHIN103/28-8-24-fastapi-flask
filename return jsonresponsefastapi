@@ -1,0 +1,40 @@
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+import os
+import json
+
+
+
+# Set environment variables
+os.environ['LANG'] = 'en_US.UTF-8'
+os.environ['LC_ALL'] = 'en_US.UTF-8'
+
+# Initialize FastAPI app
+app = FastAPI()
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+
+
+@app.get("/")
+async def home():
+    # Return an HTML page; for FastAPI, this requires a separate static file server setup.
+    return JSONResponse(content={"message": "Home page. Static file handling is required."})
+
+
+
+# Run the server
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 5000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
